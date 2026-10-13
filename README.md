@@ -32,6 +32,10 @@ Transform any photo or illustration into a true-to-scale, publication-grade diam
   - **Pages 3+ (Pattern Grid)**:
     - **Single Blueprint Mode**: 1:1 physical scale continuous layout for wide-format plotters and print shops.
     - **Tiled A4 Mode**: Printable tiled sheets for standard home printers, with 2-drill shaded overlap guidelines and sheet coordinate minimap.
+  - **Horizontal Mirror / Transfer Mode**:
+    - Optional one-click toggle to invert pattern grids and symbols horizontally via PDF Current Transformation Matrix (CTM) reflection.
+    - Designed specifically for **face-down Acrylic Gel Medium** and **Laser Toner heat transfers** onto raw cotton canvas.
+    - Reverses horizontal tile assembly order while preserving direct readability of sheet headers and the DMC inventory legend.
 
 ---
 

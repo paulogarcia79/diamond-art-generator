@@ -1,35 +1,34 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { ActivePaletteItem, ProjectConfig } from '../types/diamond';
+import type { ActivePaletteItem, ProjectConfig, PdfExportOptions } from '../types/diamond';
 
-export interface PdfExportOptions {
-  title: string;
-  config: ProjectConfig;
-  grid: string[][];
-  activePalette: ActivePaletteItem[];
-  gridWidth: number;
-  gridHeight: number;
-  exportMode: 'single' | 'tiled';
-  paperSize?: 'a4' | 'letter';
-  onProgress?: (percent: number, status: string) => void;
-  thumbnailDataUrl?: string;
+export { PdfExportOptions };
+
+function writeRawPdf(doc: jsPDF, text: string) {
+  (doc.internal as any).write(text);
 }
 
 export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Blob> {
   const {
-    title,
+    title = 'Diamond Art Pattern Template',
     config,
-    grid,
-    activePalette,
-    gridWidth,
-    gridHeight,
-    exportMode,
+    grid = [],
+    activePalette = [],
+    gridWidth = 0,
+    gridHeight = 0,
+    exportMode = 'tiled',
+    mirrorHorizontal = false,
     onProgress,
     thumbnailDataUrl
   } = options;
 
+  if (!config) {
+    throw new Error('Project config is required for PDF export');
+  }
+
   const drillMm = config.drillShape === 'square' ? 2.5 : 2.8;
   const paletteMap = new Map(activePalette.map(item => [item.code, item]));
+  const mmToPt = 72 / 25.4;
 
   const updateProgress = (pct: number, status: string) => {
     if (onProgress) onProgress(pct, status);
@@ -49,7 +48,7 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(24);
   doc.setTextColor(30, 41, 59);
-  doc.text(title || 'Diamond Art Pattern Template', 105, 30, { align: 'center' });
+  doc.text(title, 105, 30, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
@@ -70,7 +69,7 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
   // Summary Specs Card
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(25, currentY, 160, 60, 4, 4, 'FD');
+  doc.roundedRect(25, currentY, 160, 68, 4, 4, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
@@ -83,13 +82,17 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
 
   const totalDrills = gridWidth * gridHeight;
   const drillTypeLabel = config.drillShape === 'square' ? 'Square (2.5 mm)' : 'Round (2.8 mm)';
+  const printModeLabel = mirrorHorizontal
+    ? 'MIRRORED (For Face-Down Transfer)'
+    : 'Standard (Direct Print)';
 
   const specs = [
     `Physical Canvas Size: ${config.widthCm} cm × ${config.heightCm} cm`,
     `Grid Resolution: ${gridWidth} drills (width) × ${gridHeight} drills (height)`,
     `Drill Type & Size: ${drillTypeLabel}`,
     `Total Drills: ${totalDrills.toLocaleString()}`,
-    `Active DMC Colors: ${activePalette.length} shades`
+    `Active DMC Colors: ${activePalette.length} shades`,
+    `Print Orientation: ${printModeLabel}`
   ];
 
   specs.forEach((spec, idx) => {
@@ -113,7 +116,11 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
-  doc.text('Includes recommended 20% buffer for crafting and estimated weight.', 14, 27);
+  doc.text(
+    `Print Mode: ${printModeLabel} | Total Colors: ${activePalette.length}`,
+    14,
+    27
+  );
 
   const tableRows = activePalette.map(item => {
     const bufferCount = Math.ceil(item.count * 1.2);
@@ -131,7 +138,7 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
   });
 
   autoTable(doc, {
-    startY: 32,
+    startY: 34,
     margin: { left: 14, right: 14 },
     tableWidth: 182,
     head: [['Sym', 'Color', 'DMC', 'Color Name', 'Exact Count', '+20% Buffer', 'Est. Weight']],
@@ -175,13 +182,23 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
     const orientation = pageWMm > pageHMm ? 'l' : 'p';
     doc.addPage([pageWMm, pageHMm], orientation);
 
-    // Title on Blueprint
+    // Title on Blueprint (Unmirrored)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     doc.setTextColor(30, 41, 59);
-    doc.text(`${title} (1:1 Physical Scale)`, marginMm, marginMm - 12);
+    const blueprintTitle = `${title} (1:1 Scale)${mirrorHorizontal ? ' [MIRRORED FOR TRANSFER]' : ''}`;
+    doc.text(blueprintTitle, marginMm, marginMm - 12);
 
-    const startX = marginMm;
+    const blueprintGridWMm = gridWidth * drillMm;
+
+    // Apply CTM horizontal reflection if enabled
+    if (mirrorHorizontal) {
+      const pageWidthPt = (pageWMm * mmToPt).toFixed(4);
+      writeRawPdf(doc, 'q');
+      writeRawPdf(doc, `-1 0 0 1 ${pageWidthPt} 0 cm`);
+    }
+
+    const startX = mirrorHorizontal ? pageWMm - marginMm - blueprintGridWMm : marginMm;
     const startY = marginMm;
 
     // Batch draw cells
@@ -208,6 +225,10 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
       drillMm
     });
 
+    if (mirrorHorizontal) {
+      writeRawPdf(doc, 'Q');
+    }
+
   } else {
     // Mode B: Tiled A4 Pages
     // Each A4 page fits ~65 x 90 drills at 2.5mm scale comfortably with margins
@@ -229,27 +250,49 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
 
         doc.addPage('a4', 'portrait');
 
-        const cellStartX = tx * (tileCols - overlap);
+        // Reverse horizontal tile order when mirrored for face-down assembly
+        const effectiveTileCol = mirrorHorizontal ? (numTilesX - 1 - tx) : tx;
+
+        const cellStartX = effectiveTileCol * (tileCols - overlap);
         const cellEndX = Math.min(gridWidth, cellStartX + tileCols);
         const cellStartY = ty * (tileRows - overlap);
         const cellEndY = Math.min(gridHeight, cellStartY + tileRows);
 
         const countX = cellEndX - cellStartX;
         const countY = cellEndY - cellStartY;
+        const tileWidthMm = countX * drillMm;
 
-        const marginX = (210 - countX * drillMm) / 2;
+        const marginX = (210 - tileWidthMm) / 2;
         const marginY = 30; // Leave room for header
 
-        // Tile Header
+        // Tile Header (Always Unmirrored for human cutting and assembly)
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.setTextColor(15, 23, 42);
-        doc.text(`${title} — Sheet [Row ${ty + 1}/${numTilesY}, Col ${tx + 1}/${numTilesX}] (Page ${tileIndex} of ${totalTiles})`, 14, 15);
+        const headerMirrorSuffix = mirrorHorizontal ? '  |  [MIRRORED FOR TRANSFER]' : '';
+        doc.text(
+          `${title} — Sheet [Row ${ty + 1}/${numTilesY}, Col ${tx + 1}/${numTilesX}] (Page ${tileIndex} of ${totalTiles})${headerMirrorSuffix}`,
+          14,
+          15
+        );
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
         doc.setTextColor(100, 116, 139);
-        doc.text(`Cells X: [${cellStartX + 1} - ${cellEndX}], Y: [${cellStartY + 1} - ${cellEndY}] • 2-drill shaded overlap margin`, 14, 20);
+        doc.text(
+          `Cells X: [${cellStartX + 1} - ${cellEndX}], Y: [${cellStartY + 1} - ${cellEndY}] • 2-drill shaded overlap margin`,
+          14,
+          20
+        );
+
+        // Apply Horizontal Reflection Matrix if enabled
+        if (mirrorHorizontal) {
+          const pageWidthPt = (210 * mmToPt).toFixed(4);
+          writeRawPdf(doc, 'q');
+          writeRawPdf(doc, `-1 0 0 1 ${pageWidthPt} 0 cm`);
+        }
+
+        const originX = mirrorHorizontal ? (210 - marginX - tileWidthMm) : marginX;
 
         // Draw cells for this tile
         renderVectorGridChunk({
@@ -257,7 +300,7 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
           grid,
           paletteMap,
           drillMm,
-          startX: marginX,
+          startX: originX,
           startY: marginY,
           startCellX: cellStartX,
           endCellX: cellEndX,
@@ -268,7 +311,7 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
         // Draw grid lines
         drawGridRulerLines({
           doc,
-          startX: marginX,
+          startX: originX,
           startY: marginY,
           cellCountX: countX,
           cellCountY: countY,
@@ -276,6 +319,10 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
           baseOffsetX: cellStartX,
           baseOffsetY: cellStartY
         });
+
+        if (mirrorHorizontal) {
+          writeRawPdf(doc, 'Q');
+        }
       }
     }
   }
@@ -323,7 +370,7 @@ function renderVectorGridChunk(options: GridChunkOptions) {
 
     for (let x = startCellX; x < endCellX; x++) {
       const posX = startX + (x - startCellX) * drillMm;
-      const code = grid[y][x];
+      const code = grid[y]?.[x];
       const item = paletteMap.get(code);
 
       if (item) {
@@ -405,4 +452,70 @@ function drawGridRulerLines(options: RulerOptions) {
       }
     }
   }
+}
+
+/**
+ * Composable hook providing export functions compatible with plan 2.md specification
+ */
+export function usePdfExporter() {
+  const exportToPdf = async (
+    config: ProjectConfig,
+    gridData: Uint16Array | string[][],
+    palette: any[],
+    options: Partial<PdfExportOptions> | 'a4' | 'letter' | 'full' = 'a4'
+  ): Promise<Blob> => {
+    const paperFormat = typeof options === 'string' ? options : (options.paperFormat ?? 'a4');
+    const mirrorHorizontal = typeof options === 'object' ? Boolean(options.mirrorHorizontal) : false;
+
+    const drillSizeMm = config.drillShape === 'square' ? 2.5 : 2.8;
+    const gridCols = Math.max(1, Math.floor((config.widthCm * 10) / drillSizeMm));
+    const gridRows = Math.max(1, Math.floor((config.heightCm * 10) / drillSizeMm));
+
+    let grid: string[][];
+    if (Array.isArray(gridData)) {
+      grid = gridData as string[][];
+    } else {
+      grid = Array.from({ length: gridRows }, (_, r) =>
+        Array.from({ length: gridCols }, (_, c) => {
+          const idx = gridData[r * gridCols + c];
+          const item = palette[idx];
+          return item?.dmc?.code || item?.code || '310';
+        })
+      );
+    }
+
+    const activePalette: ActivePaletteItem[] = palette.map((p, idx) => {
+      const code = p.dmc?.code || p.code || String(idx);
+      const name = p.dmc?.name || p.name || `DMC ${code}`;
+      const [r, g, b] = p.dmc?.rgb || [p.r ?? 0, p.g ?? 0, p.b ?? 0];
+      const hex = p.hex || `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+      return {
+        code,
+        name,
+        r,
+        g,
+        b,
+        hex,
+        symbol: p.symbol || String.fromCharCode(65 + (idx % 26)),
+        count: p.count || 0,
+        contrastColor: p.contrastColor || (0.2126 * r + 0.7152 * g + 0.0722 * b > 140 ? '#000000' : '#FFFFFF')
+      };
+    });
+
+    const exportMode = paperFormat === 'full' ? 'single' : 'tiled';
+
+    return exportDiamondArtPdf({
+      title: 'Diamond Art Pattern & Inventory',
+      config,
+      grid,
+      activePalette,
+      gridWidth: grid[0]?.length || gridCols,
+      gridHeight: grid.length || gridRows,
+      exportMode,
+      paperFormat,
+      mirrorHorizontal
+    });
+  };
+
+  return { exportToPdf, exportDiamondArtPdf };
 }

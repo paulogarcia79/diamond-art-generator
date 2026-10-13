@@ -47,3 +47,22 @@ export interface QuantizeWorkerOutput {
   gridWidth: number;
   gridHeight: number;
 }
+
+export interface PaletteItem extends ActivePaletteItem {
+  dmc?: DmcColor;
+}
+
+export interface PdfExportOptions {
+  title?: string;
+  config?: ProjectConfig;
+  grid?: string[][];
+  activePalette?: ActivePaletteItem[];
+  gridWidth?: number;
+  gridHeight?: number;
+  exportMode?: 'single' | 'tiled';
+  paperSize?: 'a4' | 'letter';
+  paperFormat?: 'a4' | 'letter' | 'full';
+  mirrorHorizontal?: boolean;
+  onProgress?: (percent: number, status: string) => void;
+  thumbnailDataUrl?: string;
+}

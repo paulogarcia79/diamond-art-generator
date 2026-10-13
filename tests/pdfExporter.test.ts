@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { exportDiamondArtPdf } from '../src/composables/usePdfExporter';
+import { exportDiamondArtPdf, usePdfExporter } from '../src/composables/usePdfExporter';
 import type { ActivePaletteItem, ProjectConfig } from '../src/types/diamond';
 
 describe('usePdfExporter', () => {
@@ -76,5 +76,65 @@ describe('usePdfExporter', () => {
 
     expect(blob).toBeDefined();
     expect(blob.size).toBeGreaterThan(1000);
+  });
+
+  it('supports mirrored horizontal export for Single Blueprint without throwing', async () => {
+    const blob = await exportDiamondArtPdf({
+      title: 'Test Mirrored Blueprint',
+      config,
+      grid,
+      activePalette,
+      gridWidth: 20,
+      gridHeight: 20,
+      exportMode: 'single',
+      mirrorHorizontal: true
+    });
+
+    expect(blob).toBeDefined();
+    expect(blob.size).toBeGreaterThan(1000);
+  });
+
+  it('supports mirrored horizontal export for Tiled A4 without throwing', async () => {
+    const blob = await exportDiamondArtPdf({
+      title: 'Test Mirrored Tiled Pattern',
+      config,
+      grid,
+      activePalette,
+      gridWidth: 20,
+      gridHeight: 20,
+      exportMode: 'tiled',
+      mirrorHorizontal: true
+    });
+
+    expect(blob).toBeDefined();
+    expect(blob.size).toBeGreaterThan(1000);
+  });
+
+  it('supports usePdfExporter().exportToPdf() composable function with standard and mirrored options', async () => {
+    const { exportToPdf } = usePdfExporter();
+
+    // Test with Uint16Array gridData and standard options
+    const rawGrid = new Uint16Array(400);
+    for (let i = 0; i < 400; i++) rawGrid[i] = i % 2;
+
+    const blobStandard = await exportToPdf(config, rawGrid, activePalette, {
+      paperFormat: 'a4',
+      mirrorHorizontal: false
+    });
+    expect(blobStandard).toBeDefined();
+    expect(blobStandard.size).toBeGreaterThan(1000);
+
+    // Test with mirrored options
+    const blobMirrored = await exportToPdf(config, rawGrid, activePalette, {
+      paperFormat: 'a4',
+      mirrorHorizontal: true
+    });
+    expect(blobMirrored).toBeDefined();
+    expect(blobMirrored.size).toBeGreaterThan(1000);
+
+    // Test legacy string format argument
+    const blobLegacy = await exportToPdf(config, rawGrid, activePalette, 'a4');
+    expect(blobLegacy).toBeDefined();
+    expect(blobLegacy.size).toBeGreaterThan(1000);
   });
 });
