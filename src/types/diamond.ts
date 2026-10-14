@@ -63,6 +63,7 @@ export interface PdfExportOptions {
   paperSize?: 'a4' | 'letter';
   paperFormat?: 'a4' | 'letter' | 'full';
   mirrorHorizontal?: boolean;
+  colorlessGrid?: boolean;
   onProgress?: (percent: number, status: string) => void;
   thumbnailDataUrl?: string;
 }

@@ -110,7 +110,40 @@ describe('usePdfExporter', () => {
     expect(blob.size).toBeGreaterThan(1000);
   });
 
-  it('supports usePdfExporter().exportToPdf() composable function with standard and mirrored options', async () => {
+  it('supports colorless B&W mystery canvas export without throwing', async () => {
+    const blob = await exportDiamondArtPdf({
+      title: 'Test Colorless Grid Pattern',
+      config,
+      grid,
+      activePalette,
+      gridWidth: 20,
+      gridHeight: 20,
+      exportMode: 'tiled',
+      colorlessGrid: true
+    });
+
+    expect(blob).toBeDefined();
+    expect(blob.size).toBeGreaterThan(1000);
+  });
+
+  it('supports combined mirrored and colorless export for face-down transfers', async () => {
+    const blob = await exportDiamondArtPdf({
+      title: 'Test Mirrored Colorless Pattern',
+      config,
+      grid,
+      activePalette,
+      gridWidth: 20,
+      gridHeight: 20,
+      exportMode: 'tiled',
+      mirrorHorizontal: true,
+      colorlessGrid: true
+    });
+
+    expect(blob).toBeDefined();
+    expect(blob.size).toBeGreaterThan(1000);
+  });
+
+  it('supports usePdfExporter().exportToPdf() composable function with standard, mirrored, and colorless options', async () => {
     const { exportToPdf } = usePdfExporter();
 
     // Test with Uint16Array gridData and standard options
@@ -131,6 +164,24 @@ describe('usePdfExporter', () => {
     });
     expect(blobMirrored).toBeDefined();
     expect(blobMirrored.size).toBeGreaterThan(1000);
+
+    // Test with colorless option
+    const blobColorless = await exportToPdf(config, rawGrid, activePalette, {
+      paperFormat: 'a4',
+      mirrorHorizontal: false,
+      colorlessGrid: true
+    });
+    expect(blobColorless).toBeDefined();
+    expect(blobColorless.size).toBeGreaterThan(1000);
+
+    // Test combined mirrored + colorless
+    const blobBoth = await exportToPdf(config, rawGrid, activePalette, {
+      paperFormat: 'a4',
+      mirrorHorizontal: true,
+      colorlessGrid: true
+    });
+    expect(blobBoth).toBeDefined();
+    expect(blobBoth.size).toBeGreaterThan(1000);
 
     // Test legacy string format argument
     const blobLegacy = await exportToPdf(config, rawGrid, activePalette, 'a4');

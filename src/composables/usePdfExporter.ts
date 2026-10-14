@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { ActivePaletteItem, ProjectConfig, PdfExportOptions } from '../types/diamond';
+import type { ActivePaletteItem, DrillShape, ProjectConfig, PdfExportOptions } from '../types/diamond';
 
 export { PdfExportOptions };
 
@@ -18,6 +18,7 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
     gridHeight = 0,
     exportMode = 'tiled',
     mirrorHorizontal = false,
+    colorlessGrid = false,
     onProgress,
     thumbnailDataUrl
   } = options;
@@ -69,7 +70,7 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
   // Summary Specs Card
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(25, currentY, 160, 68, 4, 4, 'FD');
+  doc.roundedRect(25, currentY, 160, 74, 4, 4, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
@@ -85,6 +86,9 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
   const printModeLabel = mirrorHorizontal
     ? 'MIRRORED (For Face-Down Transfer)'
     : 'Standard (Direct Print)';
+  const styleLabel = colorlessGrid
+    ? 'B&W Wireframe (Mystery / Tracing)'
+    : 'Tinted Color Grid';
 
   const specs = [
     `Physical Canvas Size: ${config.widthCm} cm × ${config.heightCm} cm`,
@@ -92,7 +96,8 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
     `Drill Type & Size: ${drillTypeLabel}`,
     `Total Drills: ${totalDrills.toLocaleString()}`,
     `Active DMC Colors: ${activePalette.length} shades`,
-    `Print Orientation: ${printModeLabel}`
+    `Print Orientation: ${printModeLabel}`,
+    `Grid Style: ${styleLabel}`
   ];
 
   specs.forEach((spec, idx) => {
@@ -117,7 +122,7 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
   doc.text(
-    `Print Mode: ${printModeLabel} | Total Colors: ${activePalette.length}`,
+    `Print Mode: ${printModeLabel} | Grid Style: ${styleLabel} | Total Colors: ${activePalette.length}`,
     14,
     27
   );
@@ -186,7 +191,9 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     doc.setTextColor(30, 41, 59);
-    const blueprintTitle = `${title} (1:1 Scale)${mirrorHorizontal ? ' [MIRRORED FOR TRANSFER]' : ''}`;
+    const mirrorTag = mirrorHorizontal ? ' [MIRRORED]' : '';
+    const bwTag = colorlessGrid ? ' [B&W WIREFRAME]' : '';
+    const blueprintTitle = `${title} (1:1 Scale)${mirrorTag}${bwTag}`;
     doc.text(blueprintTitle, marginMm, marginMm - 12);
 
     const blueprintGridWMm = gridWidth * drillMm;
@@ -207,6 +214,8 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
       grid,
       paletteMap,
       drillMm,
+      drillShape: config.drillShape,
+      colorlessGrid,
       startX,
       startY,
       startCellX: 0,
@@ -222,7 +231,8 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
       startY,
       cellCountX: gridWidth,
       cellCountY: gridHeight,
-      drillMm
+      drillMm,
+      colorlessGrid
     });
 
     if (mirrorHorizontal) {
@@ -231,7 +241,6 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
 
   } else {
     // Mode B: Tiled A4 Pages
-    // Each A4 page fits ~65 x 90 drills at 2.5mm scale comfortably with margins
     const tileCols = Math.max(1, Math.floor(180 / drillMm)); // ~72 drills
     const tileRows = Math.max(1, Math.floor(250 / drillMm)); // ~100 drills
     const overlap = 2; // 2 drills overlap
@@ -269,9 +278,10 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.setTextColor(15, 23, 42);
-        const headerMirrorSuffix = mirrorHorizontal ? '  |  [MIRRORED FOR TRANSFER]' : '';
+        const headerMirrorSuffix = mirrorHorizontal ? '  |  [MIRRORED]' : '';
+        const headerBwSuffix = colorlessGrid ? '  |  [B&W WIREFRAME]' : '';
         doc.text(
-          `${title} — Sheet [Row ${ty + 1}/${numTilesY}, Col ${tx + 1}/${numTilesX}] (Page ${tileIndex} of ${totalTiles})${headerMirrorSuffix}`,
+          `${title} — Sheet [Row ${ty + 1}/${numTilesY}, Col ${tx + 1}/${numTilesX}] (Page ${tileIndex} of ${totalTiles})${headerMirrorSuffix}${headerBwSuffix}`,
           14,
           15
         );
@@ -300,6 +310,8 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
           grid,
           paletteMap,
           drillMm,
+          drillShape: config.drillShape,
+          colorlessGrid,
           startX: originX,
           startY: marginY,
           startCellX: cellStartX,
@@ -317,7 +329,8 @@ export async function exportDiamondArtPdf(options: PdfExportOptions): Promise<Bl
           cellCountY: countY,
           drillMm,
           baseOffsetX: cellStartX,
-          baseOffsetY: cellStartY
+          baseOffsetY: cellStartY,
+          colorlessGrid
         });
 
         if (mirrorHorizontal) {
@@ -339,6 +352,8 @@ interface GridChunkOptions {
   grid: string[][];
   paletteMap: Map<string, ActivePaletteItem>;
   drillMm: number;
+  drillShape?: DrillShape;
+  colorlessGrid?: boolean;
   startX: number;
   startY: number;
   startCellX: number;
@@ -353,6 +368,8 @@ function renderVectorGridChunk(options: GridChunkOptions) {
     grid,
     paletteMap,
     drillMm,
+    drillShape = 'square',
+    colorlessGrid = false,
     startX,
     startY,
     startCellX,
@@ -374,13 +391,28 @@ function renderVectorGridChunk(options: GridChunkOptions) {
       const item = paletteMap.get(code);
 
       if (item) {
-        // Draw background
-        doc.setFillColor(item.r, item.g, item.b);
-        doc.rect(posX, posY, drillMm, drillMm, 'F');
+        if (colorlessGrid) {
+          // B&W Mystery / Transfer Mode: Stroke-only outlines, zero color fill
+          doc.setLineWidth(0.1);
+          if (drillShape === 'square') {
+            doc.setDrawColor(150, 150, 150);
+            doc.rect(posX, posY, drillMm, drillMm, 'S');
+          } else {
+            doc.setDrawColor(200, 200, 200);
+            doc.rect(posX, posY, drillMm, drillMm, 'S');
+            doc.setDrawColor(130, 130, 130);
+            doc.circle(posX + drillMm / 2, posY + drillMm / 2, drillMm * 0.45, 'S');
+          }
+          doc.setTextColor(0, 0, 0);
+        } else {
+          // Standard Tinted Fill Mode
+          doc.setFillColor(item.r, item.g, item.b);
+          doc.rect(posX, posY, drillMm, drillMm, 'F');
 
-        // Draw symbol
-        const textRGB = item.contrastColor === '#000000' ? [0, 0, 0] : [255, 255, 255];
-        doc.setTextColor(textRGB[0], textRGB[1], textRGB[2]);
+          // Draw symbol
+          const textRGB = item.contrastColor === '#000000' ? [0, 0, 0] : [255, 255, 255];
+          doc.setTextColor(textRGB[0], textRGB[1], textRGB[2]);
+        }
 
         // Filter symbol to standard ASCII safe character if necessary
         const symbolChar = item.symbol.length === 1 ? item.symbol : item.symbol[0];
@@ -402,29 +434,49 @@ interface RulerOptions {
   drillMm: number;
   baseOffsetX?: number;
   baseOffsetY?: number;
+  colorlessGrid?: boolean;
 }
 
 function drawGridRulerLines(options: RulerOptions) {
-  const { doc, startX, startY, cellCountX, cellCountY, drillMm, baseOffsetX = 0, baseOffsetY = 0 } = options;
+  const {
+    doc,
+    startX,
+    startY,
+    cellCountX,
+    cellCountY,
+    drillMm,
+    baseOffsetX = 0,
+    baseOffsetY = 0,
+    colorlessGrid = false
+  } = options;
+
   const totalW = cellCountX * drillMm;
   const totalH = cellCountY * drillMm;
 
-  // Thin grid lines
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.05);
+  // Thin grid lines (in color mode, separate lines; in B&W mode cells already have outlines, but lines ensure precision)
+  if (!colorlessGrid) {
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.05);
 
-  for (let x = 0; x <= cellCountX; x++) {
-    const lx = startX + x * drillMm;
-    doc.line(lx, startY, lx, startY + totalH);
-  }
-  for (let y = 0; y <= cellCountY; y++) {
-    const ly = startY + y * drillMm;
-    doc.line(startX, ly, startX + totalW, ly);
+    for (let x = 0; x <= cellCountX; x++) {
+      const lx = startX + x * drillMm;
+      doc.line(lx, startY, lx, startY + totalH);
+    }
+    for (let y = 0; y <= cellCountY; y++) {
+      const ly = startY + y * drillMm;
+      doc.line(startX, ly, startX + totalW, ly);
+    }
   }
 
   // Bold 10x10 ruler lines
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.25);
+  if (colorlessGrid) {
+    doc.setDrawColor(20, 20, 20);
+    doc.setLineWidth(0.3);
+  } else {
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.25);
+  }
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6);
   doc.setTextColor(70, 70, 70);
@@ -455,7 +507,7 @@ function drawGridRulerLines(options: RulerOptions) {
 }
 
 /**
- * Composable hook providing export functions compatible with plan 2.md specification
+ * Composable hook providing export functions compatible with plan 2.md & plan 3.md specifications
  */
 export function usePdfExporter() {
   const exportToPdf = async (
@@ -466,6 +518,7 @@ export function usePdfExporter() {
   ): Promise<Blob> => {
     const paperFormat = typeof options === 'string' ? options : (options.paperFormat ?? 'a4');
     const mirrorHorizontal = typeof options === 'object' ? Boolean(options.mirrorHorizontal) : false;
+    const colorlessGrid = typeof options === 'object' ? Boolean(options.colorlessGrid) : false;
 
     const drillSizeMm = config.drillShape === 'square' ? 2.5 : 2.8;
     const gridCols = Math.max(1, Math.floor((config.widthCm * 10) / drillSizeMm));
@@ -513,7 +566,8 @@ export function usePdfExporter() {
       gridHeight: grid.length || gridRows,
       exportMode,
       paperFormat,
-      mirrorHorizontal
+      mirrorHorizontal,
+      colorlessGrid
     });
   };
 

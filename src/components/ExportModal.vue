@@ -8,7 +8,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  FlipHorizontal
+  FlipHorizontal,
+  EyeOff
 } from 'lucide-vue-next';
 
 defineProps<{
@@ -24,6 +25,7 @@ const store = useProjectStore();
 const projectTitle = ref('My Diamond Art Creation');
 const exportMode = ref<'single' | 'tiled'>('tiled');
 const mirrorHorizontal = ref(false);
+const colorlessGrid = ref(false);
 const isGenerating = ref(false);
 const progress = ref(0);
 const progressStatus = ref('');
@@ -75,6 +77,7 @@ async function handleExport() {
       gridHeight: store.gridHeight,
       exportMode: exportMode.value,
       mirrorHorizontal: mirrorHorizontal.value,
+      colorlessGrid: colorlessGrid.value,
       thumbnailDataUrl,
       onProgress: (pct, status) => {
         progress.value = pct;
@@ -87,8 +90,9 @@ async function handleExport() {
     const a = document.createElement('a');
     a.href = url;
     const sanitizedTitle = projectTitle.value.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    const suffix = mirrorHorizontal.value ? '-mirrored' : '';
-    a.download = `${sanitizedTitle}-${exportMode.value}${suffix}.pdf`;
+    const mirrorSuffix = mirrorHorizontal.value ? '-mirrored' : '';
+    const bwSuffix = colorlessGrid.value ? '-bw' : '';
+    a.download = `${sanitizedTitle}-${exportMode.value}${mirrorSuffix}${bwSuffix}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -223,6 +227,41 @@ async function handleExport() {
           </div>
         </div>
 
+        <!-- Colorless / Mystery Canvas (Symbols Only) Toggle -->
+        <div
+          @click="colorlessGrid = !colorlessGrid"
+          :class="[
+            'p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 select-none',
+            colorlessGrid
+              ? 'border-indigo-500/80 bg-indigo-500/10 text-white'
+              : 'border-slate-700 bg-slate-800/40 text-slate-300 hover:border-slate-600'
+          ]"
+        >
+          <div class="pt-0.5">
+            <input
+              type="checkbox"
+              v-model="colorlessGrid"
+              @click.stop
+              class="w-4 h-4 rounded border-slate-700 text-indigo-500 focus:ring-indigo-400 focus:ring-offset-slate-900 bg-slate-800 cursor-pointer accent-indigo-500"
+            />
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center gap-1.5 text-xs font-bold">
+              <EyeOff class="w-4 h-4 text-indigo-400" />
+              <span>Colorless / Mystery Canvas (Symbols Only)</span>
+              <span
+                v-if="colorlessGrid"
+                class="ml-auto text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-1.5 py-0.5 rounded font-mono"
+              >
+                Ink Saver / Mystery
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1 leading-snug">
+              Prints crisp black symbols and outlines on pure white with zero background color. Ideal for Mystery Canvases, glass/lightbox tracing, and clean toner canvas transfers.
+            </p>
+          </div>
+        </div>
+
         <!-- Specifications summary -->
         <div class="p-3 bg-slate-800/50 rounded-xl border border-slate-700/60 text-xs space-y-1.5 text-slate-300">
           <div class="flex justify-between">
@@ -245,6 +284,12 @@ async function handleExport() {
             <span class="text-slate-400">Print Orientation:</span>
             <span :class="['font-semibold', mirrorHorizontal ? 'text-amber-400 font-bold' : 'text-slate-300']">
               {{ mirrorHorizontal ? 'Mirrored (Face-Down Transfer)' : 'Normal (Direct Print)' }}
+            </span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">Grid Style:</span>
+            <span :class="['font-semibold', colorlessGrid ? 'text-indigo-400 font-bold' : 'text-slate-300']">
+              {{ colorlessGrid ? 'B&W Wireframe (Mystery / Tracing)' : 'Tinted Color Grid' }}
             </span>
           </div>
           <div class="flex justify-between border-t border-slate-700/80 pt-1 text-sky-400">

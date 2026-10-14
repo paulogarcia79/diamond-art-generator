@@ -36,6 +36,10 @@ Transform any photo or illustration into a true-to-scale, publication-grade diam
     - Optional one-click toggle to invert pattern grids and symbols horizontally via PDF Current Transformation Matrix (CTM) reflection.
     - Designed specifically for **face-down Acrylic Gel Medium** and **Laser Toner heat transfers** onto raw cotton canvas.
     - Reverses horizontal tile assembly order while preserving direct readability of sheet headers and the DMC inventory legend.
+  - **Colorless / Mystery Canvas Mode (Ink Saver)**:
+    - Pure black symbols and wireframe cell borders on white paper with 0% background color fill.
+    - Saves 100% of color printer ink while keeping Page 1/2 DMC inventory legend swatches intact.
+    - Perfect for **Mystery Diamond Painting** (surprise reveal as drills are placed), **lightbox / glass tracing**, and clean toner transfers without gray background residue.
 
 ---
 
